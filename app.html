@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SprinklerMath</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:#0d1117; color:#e6edf3; }
+  .wrap { max-width:720px; margin:0 auto; padding:36px 20px 60px; }
+  h1 { font-size:1.9rem; margin:0; }
+  .tag { color:#9da7b3; margin:6px 0 18px; }
+  .presets { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px; }
+  .presets button { background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:999px; padding:8px 16px; font-size:0.9rem; cursor:pointer; }
+  .presets button:hover { border-color:#3fb950; color:#3fb950; }
+  section { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; margin-bottom:18px; }
+  h2 { font-size:1rem; margin:0 0 14px; color:#e6edf3; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:14px; }
+  label { display:block; font-size:0.78rem; color:#9da7b3; margin-bottom:4px; }
+  input, select { background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; padding:8px 10px; font-size:0.95rem; width:140px; }
+  .outs { display:flex; flex-wrap:wrap; gap:12px; }
+  .out { flex:1 1 150px; background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:12px 14px; }
+  .out .val { font-size:1.15rem; font-weight:700; color:#58a6ff; }
+  .out .lab { font-size:0.75rem; color:#9da7b3; margin-top:4px; }
+  .verdict { border-radius:8px; padding:10px 14px; margin-bottom:8px; font-size:0.9rem; }
+  .v-good { background:#0d2817; border:1px solid #238636; color:#7ee2a0; }
+  .v-warn { background:#2d2306; border:1px solid #9e6a03; color:#f0c659; }
+  .v-bad { background:#3d1214; border:1px solid #da3633; color:#ff9492; }
+  .plan { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:14px 16px; font-size:0.95rem; line-height:1.7; }
+  .plan b { color:#58a6ff; }
+  .foot { color:#6e7681; font-size:0.8rem; margin-top:10px; }
+  a { color:#58a6ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#128167; SprinklerMath</h1>
+  <p class="tag">Sprinkler zone math - heads are sold by radius, zones fail on GPM, and water deep and infrequent never comes with the minutes for your soil.</p>
+  <div class="presets">
+    <button data-p="sprays">Front lawn, sprays</button>
+    <button data-p="rotors">Big lawn, rotors</button>
+    <button data-p="clay">Clay slope fix</button>
+    <button data-p="drip">Drip beds</button>
+  </div>
+
+  <section>
+    <h2>1. Your water</h2>
+    <div class="row">
+      <div><label>Supply (GPM)</label><input id="supply" type="number" step="0.5" min="1" value="10"></div>
+      <div><label>Static pressure (psi)</label><input id="psi" type="number" step="1" min="10" value="50"></div>
+      <div><label>Lateral pipe</label>
+        <select id="pipe"><option value="3/4 in">3/4 in</option><option value="1 in">1 in</option><option value="1-1/4 in">1-1/4 in</option></select></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. The system</h2>
+    <div class="row">
+      <div><label>Head type</label>
+        <select id="head"><option value="spray">Spray (1.5 GPM)</option><option value="rotor">Rotor (3 GPM)</option><option value="drip">Drip emitter (0.5 GPH)</option></select></div>
+      <div><label>Head count</label><input id="count" type="number" step="1" min="1" value="8"></div>
+      <div><label>Area (sq ft)</label><input id="area" type="number" step="50" min="50" value="1200"></div>
+      <div><label>Soil</label>
+        <select id="soil"><option value="sand">Sandy (0.8 in/hr)</option><option value="loam" selected>Loam (0.4 in/hr)</option><option value="clay">Clay (0.15 in/hr)</option></select></div>
+      <div><label>Water need (in/week)</label><input id="need" type="number" step="0.25" min="0.25" value="1"></div>
+    </div>
+    <div class="outs">
+      <div class="out"><div class="val" id="o-zones"></div><div class="lab">Zones needed</div></div>
+      <div class="out"><div class="val" id="o-perzone"></div><div class="lab">Heads per zone</div></div>
+      <div class="out"><div class="val" id="o-zonegpm"></div><div class="lab">Zone draw</div></div>
+      <div class="out"><div class="val" id="o-pr"></div><div class="lab">Precipitation rate</div></div>
+      <div class="out"><div class="val" id="o-vel"></div><div class="lab">Pipe velocity</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. The schedule</h2>
+    <div class="outs">
+      <div class="out"><div class="val" id="o-week"></div><div class="lab">Total per week (each zone)</div></div>
+      <div class="out"><div class="val" id="o-session"></div><div class="lab">Per session (3x/week)</div></div>
+      <div class="out"><div class="val" id="o-maxrun"></div><div class="lab">Soil runoff limit</div></div>
+    </div>
+    <div class="plan" id="o-plan" style="margin-top:12px"></div>
+  </section>
+
+  <section>
+    <h2>4. Honest check</h2>
+    <div id="verdicts"></div>
+  </section>
+
+  <p class="foot">Precipitation rate = 96.25 x GPM / sq ft. Velocity limit 5 ft/s in schedule-40 PVC. Supply usable at 90%. <a href="https://github.com/iLanis-agent/sprinklermath">Source</a></p>
+</div>
+<script src="engine.js"></script>
+<script>
+var F = ['supply','psi','pipe','head','count','area','soil','need'];
+var PRESETS = {
+  sprays: { supply:10, psi:50, pipe:'3/4 in', head:'spray', count:8,  area:1200, soil:'loam', need:1 },
+  rotors: { supply:12, psi:50, pipe:'1 in',    head:'rotor', count:6,  area:5000, soil:'clay', need:1 },
+  clay:   { supply:8,  psi:45, pipe:'3/4 in',  head:'spray', count:12, area:900,  soil:'clay', need:1 },
+  drip:   { supply:10, psi:25, pipe:'3/4 in',  head:'drip',  count:40, area:200,  soil:'loam', need:1 }
+};
+function el(id) { return document.getElementById(id); }
+function update() {
+  var r = SprinklerMath.compute({
+    supplyGpm: +el('supply').value, psi: +el('psi').value, pipeSize: el('pipe').value,
+    headType: el('head').value, headCount: +el('count').value, areaSqft: +el('area').value,
+    soil: el('soil').value, needInPerWeek: +el('need').value
+  });
+  if (r.error) { el('o-zones').textContent = r.error; return; }
+  el('o-zones').textContent = r.zones;
+  el('o-perzone').textContent = r.headsInZone;
+  el('o-zonegpm').textContent = r.zoneGpm + ' GPM';
+  el('o-pr').textContent = r.pr + ' in/hr';
+  el('o-vel').textContent = r.velocity + ' ft/s';
+  el('o-week').textContent = SprinklerMath.fmtMin(r.weeklyMin);
+  el('o-session').textContent = SprinklerMath.fmtMin(r.sessionMin);
+  el('o-maxrun').textContent = r.maxCycleMin == null ? '-' : SprinklerMath.fmtMin(r.maxCycleMin);
+  var p = r.plan;
+  el('o-plan').innerHTML = p.cycles === 1
+    ? 'Each session: run <b>' + SprinklerMath.fmtMin(p.runMin) + '</b> per zone, ' + r.sessions + ' sessions a week. One run finishes the job.'
+    : 'Each session: <b>' + p.cycles + ' cycles</b> of <b>' + SprinklerMath.fmtMin(p.runMin) + '</b> with <b>' + p.soakMin + ' min soak</b> between them, ' + r.sessions + ' sessions a week. Same water, none of it on the sidewalk.';
+  el('verdicts').innerHTML = r.checks.map(function (c) {
+    return '<div class="verdict v-' + c.level + '">' + c.text + '</div>';
+  }).join('');
+}
+F.forEach(function (id) {
+  el(id).addEventListener('input', update);
+  el(id).addEventListener('change', update);
+});
+document.querySelectorAll('.presets button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var p = PRESETS[b.getAttribute('data-p')];
+    el('supply').value = p.supply; el('psi').value = p.psi; el('pipe').value = p.pipe;
+    el('head').value = p.head; el('count').value = p.count; el('area').value = p.area;
+    el('soil').value = p.soil; el('need').value = p.need;
+    update();
+  });
+});
+update();
+</script>
+</body>
+</html>
